@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Rueda de pestañas",
+  "description": "Cambia de pestaña con clic derecho y la rueda del ratón.",
+  "version": "1.0.0",
+  "permissions": ["tabs", "storage", "favicon", "scripting", "windows"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Rueda de pestañas"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["gesture.js", "defaults.js", "content.js"],
+      "css": ["host.css"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}

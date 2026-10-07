@@ -1,0 +1,21 @@
+/* Estilos del host fuera del shadow. Van por content_scripts: la CSP de la página no los bloquea. */
+#rueda-pestanas-host {
+  pointer-events: none !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: visible !important;
+  box-shadow: none !important;
+  position: fixed !important;
+}
+
+#rueda-pestanas-host.rueda-fallback {
+  display: block !important;
+  z-index: 2147483647 !important;
+}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Rueda de pestañas</title>
+  <style>
+    body {
+      font: 14px/1.45 system-ui, sans-serif;
+      margin: 24px;
+      max-width: 36rem;
+      color: #161616;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 8px; }
+    p { margin: 0 0 16px; color: #333; }
+    label { display: block; margin: 12px 0; }
+    select { margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Rueda de pestañas</h1>
+  <p>Clic derecho + rueda cambia de pestaña. Soltar activa la resaltada. Esc cancela. Sin mover la rueda, el menú contextual sigue igual.</p>
+  <label>
+    Orden
+    <select id="orden">
+      <option value="posicion">Posición en la barra</option>
+      <option value="reciente">Uso reciente</option>
+    </select>
+  </label>
+  <label><input id="invertir" type="checkbox"> Invertir dirección de la rueda</label>
+  <label><input id="ciclo" type="checkbox" checked> Ciclo continuo</label>
+  <p>La rueda hacia abajo sigue el orden elegido. Invertir le da la vuelta.</p>
+  <script src="defaults.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
