@@ -3,7 +3,7 @@
   "name": "Rueda de pestañas",
   "description": "Cambia de pestaña con clic derecho y la rueda del ratón.",
   "version": "1.0.0",
-  "permissions": ["tabs", "storage", "favicon", "scripting", "windows"],
+  "permissions": ["tabs", "storage", "favicon", "scripting", "windows", "search", "topSites"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
@@ -22,6 +22,9 @@
       "match_origin_as_fallback": true
     }
   ],
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true

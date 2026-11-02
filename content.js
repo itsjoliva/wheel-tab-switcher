@@ -1,7 +1,10 @@
 (function () {
-  if (globalThis.__ruedaPestanas) return;
   if (!globalThis.gestureApi) return;
-  globalThis.__ruedaPestanas = true;
+  // Al recargar la extensión, el script viejo queda huérfano en las pestañas abiertas: el nuevo lo desmonta.
+  if (typeof globalThis.__ruedaPestanas === "function") globalThis.__ruedaPestanas();
+  const fin = new AbortController();
+  const signal = fin.signal;
+  globalThis.__ruedaPestanas = desmontar;
 
   const DEF = globalThis.RUEDA_DEFECTO || {
     orden: "posicion",
@@ -26,6 +29,9 @@
   // En Windows el contextmenu llega después del mouseup: hay que recordar el trago.
   let tragarMenu = false;
   let olvido = 0;
+  // macOS y Linux lanzan el menú al pulsar, antes de saber si habrá rueda.
+  let menuAlPulsar = false;
+  let sinGesto = 0;
   let wheelOn = false;
 
   let opciones = { ...DEF };
@@ -36,6 +42,9 @@
   let seq = 0;
   let pedidoActivo = false;
   let overlay = null;
+  // Filas del gesto en curso: se crean una vez y cada paso solo mueve la clase "sel".
+  let filas = [];
+  let marcado = -1;
 
   const OVERLAY_CSS = `
     .panel {
@@ -44,39 +53,34 @@
       top: 50%;
       transform: translate(-50%, -50%);
       box-sizing: border-box;
-      width: min(420px, calc(100vw - 32px));
-      max-height: 70vh;
-      overflow: auto;
+      width: min(520px, calc(100vw - 32px));
       margin: 0;
-      padding: 6px;
-      border-radius: 12px;
-      border: 1px solid rgba(127, 127, 127, 0.35);
-      background: #fff;
-      color: #161616;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
-      font: 13px/1.35 system-ui, sans-serif;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #1b1c20;
+      color: #e6e6e6;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+      font: 13px/1.3 system-ui, sans-serif;
       user-select: none;
       pointer-events: none;
     }
-    @media (prefers-color-scheme: dark) {
-      .panel {
-        background: #1e1e1e;
-        color: #f3f3f3;
-        border-color: rgba(255, 255, 255, 0.12);
-      }
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      overflow: auto;
+      max-height: min(86vh, 900px);
+      scrollbar-width: thin;
     }
-    ul { list-style: none; margin: 0; padding: 0; }
     li {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 8px;
-      border-radius: 8px;
+      padding: 4px 8px;
+      border-radius: 4px;
     }
-    li.sel { background: #e8f0fe; }
-    @media (prefers-color-scheme: dark) {
-      li.sel { background: #2d4a7a; }
-    }
+    li.sel { background: #a3d14b; color: #111; }
     .icono {
       width: 16px;
       height: 16px;
@@ -110,9 +114,25 @@
     }
   `;
 
+  function desmontar() {
+    fin.abort();
+    soltarRueda();
+    if (overlay) overlay.host.remove();
+    overlay = null;
+  }
+
+  function enviar(msg) {
+    try {
+      return chrome.runtime.sendMessage(msg);
+    } catch (e) {
+      // Sin contexto (extensión recargada o quitada) sendMessage lanza en vez de rechazar.
+      desmontar();
+      return Promise.reject(e);
+    }
+  }
+
   function reenviar(kind, e) {
-    return chrome.runtime
-      .sendMessage({
+    return enviar({
         type: "relay",
         kind,
         deltaY: e.deltaY || 0,
@@ -129,7 +149,7 @@
   }
 
   function avisarArmado(armed) {
-    chrome.runtime.sendMessage({ type: "armar", armed: !!armed }).catch(() => {});
+    enviar({ type: "armar", armed: !!armed }).catch(() => {});
   }
 
   function marcarTragar() {
@@ -150,7 +170,7 @@
   function engancharRueda() {
     if (wheelOn) return;
     wheelOn = true;
-    window.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    window.addEventListener("wheel", onWheel, { capture: true, passive: false, signal });
   }
 
   function soltarRueda() {
@@ -177,6 +197,8 @@
     pestanas = null;
     cola = [];
     indice = 0;
+    filas = [];
+    marcado = -1;
     if (overlay) overlay.ul.replaceChildren();
     ocultar();
   }
@@ -198,7 +220,7 @@
 
   function activar(tab) {
     if (!tab || typeof tab.id !== "number") return;
-    chrome.runtime.sendMessage({ type: "activate", tabId: tab.id }).catch(() => {});
+    enviar({ type: "activate", tabId: tab.id }).catch(() => {});
   }
 
   function alSoltar() {
@@ -269,15 +291,15 @@
     if (pedidoActivo) return;
     pedidoActivo = true;
     const mio = seq;
-    chrome.runtime
-      .sendMessage({ type: "getTabs" })
+    enviar({ type: "getTabs" })
       .then((res) => {
         if (mio !== seq) return;
         if (!res || !res.tabs || !res.tabs.length) {
           falloTabs();
           return;
         }
-        if (estado !== "activo" && !soltarPendiente) return;
+        // En "pulsado" es la precarga del mousedown: se guarda y se pinta al primer paso.
+        if (estado === "reposo" && !soltarPendiente) return;
         pestanas = res.tabs;
         if (res.opciones) opciones = { ...DEF, ...res.opciones };
         indice = pestanas.findIndex((t) => t.active);
@@ -418,38 +440,45 @@
     return box;
   }
 
-  function centrar(panel, li) {
-    const pr = panel.getBoundingClientRect();
+  function centrar(lista, li) {
+    const pr = lista.getBoundingClientRect();
     const lr = li.getBoundingClientRect();
     if (!pr.height || !lr.height) return;
-    panel.scrollTop += lr.top - pr.top - (pr.height - lr.height) / 2;
+    lista.scrollTop += lr.top - pr.top - (pr.height - lr.height) / 2;
+  }
+
+  function construir(ui) {
+    filas = pestanas.map((tab) => {
+      const li = document.createElement("li");
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", "false");
+      const titulo = document.createElement("span");
+      titulo.className = "titulo";
+      titulo.textContent = tab.title || tab.url || "(sin título)";
+      li.append(iconoDe(tab), titulo);
+      return li;
+    });
+    marcado = -1;
+    ui.ul.replaceChildren(...filas);
   }
 
   function pintar() {
     if (!pestanas || estado !== "activo") return;
     const ui = asegurarOverlay();
     if (!ui) return;
-    ui.ul.replaceChildren();
-    let sel = null;
-    for (let i = 0; i < pestanas.length; i++) {
-      const tab = pestanas[i];
-      const li = document.createElement("li");
-      li.setAttribute("role", "option");
-      if (i === indice) {
-        li.className = "sel";
-        li.setAttribute("aria-selected", "true");
-        sel = li;
-      } else {
-        li.setAttribute("aria-selected", "false");
-      }
-      const titulo = document.createElement("span");
-      titulo.className = "titulo";
-      titulo.textContent = tab.title || tab.url || "(sin título)";
-      li.append(iconoDe(tab), titulo);
-      ui.ul.append(li);
-    }
+    if (filas.length !== pestanas.length) construir(ui);
     mostrar(ui.host);
-    if (sel) centrar(ui.panel, sel);
+    const li = filas[indice];
+    if (!li || marcado === indice) return;
+    const previo = filas[marcado];
+    if (previo) {
+      previo.classList.remove("sel");
+      previo.setAttribute("aria-selected", "false");
+    }
+    li.classList.add("sel");
+    li.setAttribute("aria-selected", "true");
+    marcado = indice;
+    centrar(ui.ul, li);
   }
 
   function abrirVacio() {
@@ -470,6 +499,7 @@
       engancharRueda();
       if (esPrincipal) {
         if (estado === "reposo") estado = "pulsado";
+        if (estado === "pulsado" && !pestanas) pedirPestanas();
       } else {
         reenviar("ping", e);
       }
@@ -491,17 +521,23 @@
     if (esPrincipal) {
       if (estado !== "activo" && estado !== "cancelado") avisarArmado(false);
       if (estado === "reposo") estado = "pulsado";
+      if (estado === "pulsado" && !pestanas) pedirPestanas();
       return;
     }
     acumulado = 0;
     armedLocal = false;
     armedRemoto = false;
     reenviar("down", e);
-  }, true);
+  }, { capture: true, signal });
 
   window.addEventListener("mouseup", (e) => {
     if (e.button !== 2) return;
     const participa = botonDerecho || armedLocal || armedRemoto;
+    const huboGesto = esPrincipal
+      ? estado === "activo" || estado === "cancelado"
+      : armedLocal || armedRemoto;
+    if (menuAlPulsar && !huboGesto) sinGesto = Date.now();
+    menuAlPulsar = false;
     botonDerecho = false;
     soltarRueda();
     if (esPrincipal) {
@@ -509,12 +545,23 @@
       return;
     }
     if (participa) soltarIframe();
-  }, true);
+  }, { capture: true, signal });
 
-  window.addEventListener("mousemove", alMover, true);
-  window.addEventListener("mouseover", alMover, true);
+  window.addEventListener("mousemove", alMover, { capture: true, signal });
+  window.addEventListener("mouseover", alMover, { capture: true, signal });
 
   window.addEventListener("contextmenu", (e) => {
+    if (botonDerecho) {
+      // Se traga siempre; un segundo clic derecho rápido sin rueda deja salir el menú.
+      menuAlPulsar = true;
+      if (Date.now() - sinGesto < 500) {
+        sinGesto = 0;
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     const tragar =
       tragarMenu ||
       armedLocal ||
@@ -529,7 +576,7 @@
     armedLocal = false;
     armedRemoto = false;
     clearTimeout(olvido);
-  }, true);
+  }, { capture: true, signal });
 
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
@@ -546,7 +593,7 @@
       e.stopPropagation();
     }
     reenviar("esc", e);
-  }, true);
+  }, { capture: true, signal });
 
   if (esPrincipal) {
     chrome.storage.local.get(DEF, (o) => {
@@ -558,12 +605,14 @@
         if (Object.prototype.hasOwnProperty.call(DEF, k)) opciones[k] = v.newValue;
       }
     });
-    chrome.runtime.onMessage.addListener((msg) => {
-      if (!msg || msg.type !== "relay") return;
+    chrome.runtime.onMessage.addListener((msg, sender) => {
+      // En la nueva pestaña propia (página de la extensión) llegan también los mensajes de otras pestañas.
+      if (signal.aborted || !msg || msg.type !== "relay" || (sender && sender.tab)) return;
       if (msg.kind === "down" || msg.kind === "ping") {
         botonDerecho = true;
         engancharRueda();
         if (estado === "reposo") estado = "pulsado";
+        if (estado === "pulsado" && !pestanas) pedirPestanas();
         return;
       }
       if (msg.kind === "wheel") {
@@ -581,15 +630,16 @@
     });
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") cancelar();
-    }, true);
+    }, { capture: true, signal });
     // blur también salta cuando el foco entra en un iframe. Solo cancela si la ventana de Chrome lo perdió.
     window.addEventListener("blur", () => {
       if (estado === "reposo") return;
-      chrome.runtime.sendMessage({ type: "ventanaEnfocada" }, (res) => {
-        if (chrome.runtime.lastError) return;
-        if (res && res.enfocada === false) cancelar();
-      });
-    }, true);
-    window.addEventListener("pagehide", () => cancelar(), true);
+      enviar({ type: "ventanaEnfocada" })
+        .then((res) => {
+          if (res && res.enfocada === false) cancelar();
+        })
+        .catch(() => {});
+    }, { capture: true, signal });
+    window.addEventListener("pagehide", () => cancelar(), { capture: true, signal });
   }
 })();

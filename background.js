@@ -6,6 +6,16 @@ const { ordenarPestanas } = globalThis.gestureApi;
 // Gesto armado por pestaña, para que un iframe pueda tragarse el menú sin esperar al marco principal.
 const armado = new Map();
 let colaMru = Promise.resolve();
+// Copia en memoria del MRU: se lee de storage.session una vez por vida del service worker.
+let cargaMru = null;
+
+function leerMru() {
+  if (!cargaMru) cargaMru = chrome.storage.session
+      .get("mru")
+      .then((d) => d.mru || {})
+      .catch(() => ({}));
+  return cargaMru;
+}
 
 function tocarMru(fn) {
   colaMru = colaMru.then(fn).catch(() => {});
@@ -13,8 +23,7 @@ function tocarMru(fn) {
 
 function ponerAlFrente(windowId, tabId) {
   tocarMru(async () => {
-    const data = await chrome.storage.session.get("mru");
-    const mru = data.mru || {};
+    const mru = await leerMru();
     const key = String(windowId);
     const prev = Array.isArray(mru[key]) ? mru[key] : [];
     // ponytail: 500 ids por ventana; se caen los más viejos. Una sesión normal no llega.
@@ -25,8 +34,7 @@ function ponerAlFrente(windowId, tabId) {
 
 function quitarDeMru(tabId, windowId) {
   tocarMru(async () => {
-    const data = await chrome.storage.session.get("mru");
-    const mru = data.mru || {};
+    const mru = await leerMru();
     const keys = windowId == null ? Object.keys(mru) : [String(windowId)];
     let cambio = false;
     for (const key of keys) {
@@ -56,8 +64,7 @@ chrome.tabs.onDetached.addListener((tabId, info) => {
 
 chrome.windows.onRemoved.addListener((windowId) => {
   tocarMru(async () => {
-    const data = await chrome.storage.session.get("mru");
-    const mru = data.mru || {};
+    const mru = await leerMru();
     const key = String(windowId);
     if (!mru[key]) return;
     delete mru[key];
@@ -90,14 +97,14 @@ chrome.action.onClicked.addListener(() => {
 });
 
 async function responderPestanas(windowId) {
-  const [tabs, stored, session] = await Promise.all([
+  const [tabs, stored, mruTodas] = await Promise.all([
     chrome.tabs.query({ windowId }),
     chrome.storage.local.get(OPCIONES_DEFECTO),
-    chrome.storage.session.get("mru"),
+    leerMru(),
   ]);
   // La ventana es la del mensaje: currentWindow en el service worker es otra cosa.
   const opciones = { ...OPCIONES_DEFECTO, ...stored };
-  const mru = (session.mru || {})[String(windowId)] || [];
+  const mru = mruTodas[String(windowId)] || [];
   const ordenadas = ordenarPestanas(tabs, opciones.orden, mru);
   return {
     opciones,

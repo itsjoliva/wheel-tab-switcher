@@ -2,33 +2,218 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rueda de pestañas</title>
   <style>
-    body {
-      font: 14px/1.45 system-ui, sans-serif;
-      margin: 24px;
-      max-width: 36rem;
-      color: #161616;
+    :root {
+      --fondo: #f3f4f6;
+      --tarjeta: #ffffff;
+      --borde: rgba(0, 0, 0, 0.08);
+      --texto: #1b1c20;
+      --suave: #5f6368;
+      --acento: #7cb342;
+      --sobre-acento: #111;
+      --pista: #d1d5db;
     }
-    h1 { font-size: 1.25rem; margin: 0 0 8px; }
-    p { margin: 0 0 16px; color: #333; }
-    label { display: block; margin: 12px 0; }
-    select { margin-left: 8px; }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fondo: #16171a;
+        --tarjeta: #222328;
+        --borde: rgba(255, 255, 255, 0.08);
+        --texto: #e6e6e6;
+        --suave: #9ca3af;
+        --acento: #a3d14b;
+        --pista: #3a3b41;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--fondo);
+      color: var(--texto);
+      font: 14px/1.5 system-ui, sans-serif;
+    }
+    main {
+      max-width: 40rem;
+      margin: 0 auto;
+      padding: 40px 16px 64px;
+    }
+    header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+    .logo {
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      border-radius: 12px;
+      background: var(--acento);
+      color: var(--sobre-acento);
+      display: grid;
+      place-items: center;
+    }
+    h1 { font-size: 1.4rem; margin: 0; }
+    .lema { margin: 0 0 28px; color: var(--suave); }
+    kbd {
+      font: 12px/1 ui-monospace, monospace;
+      padding: 3px 6px;
+      border-radius: 5px;
+      border: 1px solid var(--borde);
+      background: var(--tarjeta);
+    }
+    section {
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+      border-radius: 14px;
+      padding: 6px 20px;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--suave);
+      margin: 24px 0 8px;
+    }
+    .fila {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0;
+      cursor: pointer;
+    }
+    .fila + .fila { border-top: 1px solid var(--borde); }
+    .fila small { display: block; color: var(--suave); font-size: 12.5px; }
+
+    /* Interruptor: sigue siendo un checkbox nativo, solo cambia el aspecto. */
+    .switch {
+      appearance: none;
+      flex: 0 0 auto;
+      width: 40px;
+      height: 24px;
+      margin: 0;
+      border-radius: 999px;
+      background: var(--pista);
+      position: relative;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .switch::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      transition: transform 0.15s;
+    }
+    .switch:checked { background: var(--acento); }
+    .switch:checked::after { transform: translateX(16px); }
+    .switch:focus-visible, .segmentos input:focus-visible + span {
+      outline: 2px solid var(--acento);
+      outline-offset: 2px;
+    }
+
+    .segmentos {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      margin: 14px 0;
+      border: 0;
+      border-radius: 10px;
+      background: var(--fondo);
+    }
+    .segmentos legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .segmentos label { cursor: pointer; }
+    .segmentos input { position: absolute; opacity: 0; }
+    .segmentos span {
+      display: block;
+      text-align: center;
+      padding: 8px 10px;
+      border-radius: 7px;
+      color: var(--suave);
+    }
+    .segmentos input:checked + span {
+      background: var(--tarjeta);
+      color: var(--texto);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+    .nota { color: var(--suave); font-size: 12.5px; margin: 0 0 14px; }
+    ul.limites { margin: 14px 0; padding-left: 18px; color: var(--suave); }
+    #estado {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: var(--texto);
+      color: var(--fondo);
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    #estado.visible { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) {
+      .switch, .switch::after, #estado { transition: none; }
+    }
   </style>
 </head>
 <body>
-  <h1>Rueda de pestañas</h1>
-  <p>Clic derecho + rueda cambia de pestaña. Soltar activa la resaltada. Esc cancela. Sin mover la rueda, el menú contextual sigue igual.</p>
-  <label>
-    Orden
-    <select id="orden">
-      <option value="posicion">Posición en la barra</option>
-      <option value="reciente">Uso reciente</option>
-    </select>
-  </label>
-  <label><input id="invertir" type="checkbox"> Invertir dirección de la rueda</label>
-  <label><input id="ciclo" type="checkbox" checked> Ciclo continuo</label>
-  <p>La rueda hacia abajo sigue el orden elegido. Invertir le da la vuelta.</p>
+  <main>
+    <header>
+      <div class="logo" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="6"/><path d="M12 6v4"/></svg>
+      </div>
+      <h1>Rueda de pestañas</h1>
+    </header>
+    <p class="lema">Mantén <kbd>clic derecho</kbd> y gira la rueda para elegir pestaña. Suelta para ir a ella, <kbd>Esc</kbd> para cancelar. Sin girar la rueda, el menú contextual sale como siempre; en macOS, con doble clic derecho.</p>
+
+    <h2>Orden de la lista</h2>
+    <section>
+      <fieldset class="segmentos">
+        <legend>Orden de la lista</legend>
+        <label><input type="radio" name="orden" value="posicion"><span>Posición en la barra</span></label>
+        <label><input type="radio" name="orden" value="reciente"><span>Uso reciente</span></label>
+      </fieldset>
+    </section>
+
+    <h2>Rueda</h2>
+    <section>
+      <label class="fila">
+        <span>Invertir dirección<small>Por defecto, la rueda hacia abajo avanza en la lista.</small></span>
+        <input id="invertir" class="switch" type="checkbox">
+      </label>
+      <label class="fila">
+        <span>Ciclo continuo<small>Al llegar al final se vuelve al principio.</small></span>
+        <input id="ciclo" class="switch" type="checkbox">
+      </label>
+    </section>
+
+    <h2>Nueva pestaña</h2>
+    <section>
+      <label class="fila">
+        <span>Usar la nueva pestaña de la extensión<small>Buscador y sitios más visitados. Permite el gesto también ahí.</small></span>
+        <input id="nuevaPestana" class="switch" type="checkbox">
+      </label>
+      <p class="nota">Desactivada, se muestra la de Chrome tras un instante en blanco: Chrome no deja quitar el reemplazo sin desinstalar la extensión.</p>
+    </section>
+
+    <h2>Dónde no funciona el gesto</h2>
+    <section>
+      <ul class="limites">
+        <li>Páginas <code>chrome://</code>, la Chrome Web Store y el visor PDF (aparecen en la lista y se pueden activar desde otra pestaña).</li>
+        <li>La barra de pestañas y la de direcciones: solo sobre el contenido.</li>
+        <li>En <code>file://</code>, si no se permite el acceso a archivos en los detalles de la extensión.</li>
+      </ul>
+    </section>
+  </main>
+  <div id="estado" role="status" aria-live="polite"></div>
   <script src="defaults.js"></script>
   <script src="options.js"></script>
 </body>

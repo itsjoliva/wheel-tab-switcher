@@ -4,6 +4,7 @@
     orden: "posicion",
     invertirRueda: false,
     ciclo: true,
+    nuevaPestana: true,
   };
   root.RUEDA_DEFECTO = RUEDA_DEFECTO;
   if (typeof module !== "undefined" && module.exports) module.exports = RUEDA_DEFECTO;

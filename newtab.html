@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nueva pestaña</title>
+  <link rel="stylesheet" href="host.css">
+  <style>
+    :root {
+      --fondo: #f3f4f6;
+      --tarjeta: #ffffff;
+      --borde: rgba(0, 0, 0, 0.08);
+      --texto: #1b1c20;
+      --suave: #6b7280;
+      --acento: #7cb342;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fondo: #16171a;
+        --tarjeta: #222328;
+        --borde: rgba(255, 255, 255, 0.08);
+        --texto: #e6e6e6;
+        --suave: #9ca3af;
+        --acento: #a3d14b;
+      }
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--fondo);
+      color: var(--texto);
+      font: 14px/1.4 system-ui, sans-serif;
+    }
+    /* Oculto hasta leer la opción: si está desactivada solo se ve el fondo antes de ir a la de Chrome. */
+    main { display: none; }
+    body.lista main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+      box-sizing: border-box;
+      min-height: 100%;
+      padding: 18vh 16px 32px;
+    }
+    form { width: min(600px, 100%); }
+    input[type="search"] {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 999px;
+      border: 1px solid var(--borde);
+      background: var(--tarjeta);
+      color: inherit;
+      font: inherit;
+      font-size: 16px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      outline: none;
+    }
+    input[type="search"]:focus-visible { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 35%, transparent); }
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+      gap: 12px;
+      width: min(600px, 100%);
+    }
+    a {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 8px 10px;
+      border-radius: 12px;
+      color: inherit;
+      text-decoration: none;
+    }
+    a:hover, a:focus-visible { background: var(--tarjeta); outline: none; box-shadow: 0 0 0 1px var(--borde); }
+    .icono {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+    }
+    .icono img { width: 24px; height: 24px; }
+    .nombre {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      color: var(--suave);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <form role="search">
+      <input id="q" type="search" placeholder="Buscar en la web" aria-label="Buscar en la web" autocomplete="off">
+    </form>
+    <ul id="sitios" aria-label="Sitios más visitados"></ul>
+  </main>
+  <script src="gesture.js"></script>
+  <script src="defaults.js"></script>
+  <script src="content.js"></script>
+  <script src="newtab.js"></script>
+</body>
+</html>
